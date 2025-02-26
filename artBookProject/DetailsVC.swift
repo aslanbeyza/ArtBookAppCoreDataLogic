@@ -11,9 +11,64 @@ class DetailsVC: UIViewController, UIImagePickerControllerDelegate & UINavigatio
     @IBOutlet weak var artistTextField: UITextField!
     @IBOutlet weak var yearTextField: UITextField!
     
+    var chosenPainting = ""
+    var chosenPaintingId : UUID?
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        //seçilen boş ise boş göster değilse dolu göster dicez burdada
+        if chosenPainting != "" {
+            //Core Data
+            let stringUUID = chosenPaintingId!.uuidString
+            print(stringUUID)
+            //Burada core datadan verilerimizi çekicez
+            let appDelegate = UIApplication.shared.delegate as! AppDelegate //AppDelegate değişken olarak tanımladık
+            let context = appDelegate.persistentContainer.viewContext
+            //çekme işlemine geldik fetch request atalım  tut getirmekten geliyor
+            let fetchRequest = NSFetchRequest<NSFetchRequestResult>(entityName: "Paintings")
+            fetchRequest.returnsObjectsAsFaults = false  //cache den okuma daha hızlı okusun diye
+            //filtreleme yapmam lazım
+            let idString = chosenPaintingId!.uuidString
+            //kosul yazıcam o kosulu bullup getiricek bana kayıtlı seylerı cek dicem
+            fetchRequest.predicate = NSPredicate(format: "id == %@", idString) //id si şurdaki argümana eşit olan şeyi bana bul getir diyo
+            //isimden arama yapıyo olsaydım
+            //fetchRequest.predicate = NSPredicate(format: "name == %@", self.chosenPainting) derdim
+            fetchRequest.returnsObjectsAsFaults = false
+            do{
+            let results =   try  context.fetch(fetchRequest) //results bize bir dizi verir
+                print("results",results)
+                if results.count > 0 {
+                  for result in results as! [NSManagedObject] {
+                      if let  name =   result.value(forKey: "name") as? String
+                      {
+                          nameTextField.text = name
+                      }
+                       if let  artist = result.value(forKey: "artist") as? String
+                            {
+                             artistTextField.text  = artist
+                            }
+                            if let  year =   result.value(forKey: "year") as? Int{
+                                yearTextField.text = String(year)
+                            }   //stringe cevir o sekılde göster diyoruz burada
+                      
+                      if let  imageData = result.value(forKey: "image") as? Data
+                           {
+                          let image = UIImage(data: imageData)
+                          imageView.image = image
+                           }
+                  }
+                }
+            }catch{
+                print("error")
+            }
+        }else {
+            nameTextField.text = ""
+            imageView.image = UIImage(named: "select")
+            artistTextField.text = ""
+            yearTextField.text = ""
+        }
+        
+        
         
         // RECOGNİZERS
         // Klavyeyi gizlemek için ekrana dokunmayı algılayan bir gesture recognizer ekleyelim

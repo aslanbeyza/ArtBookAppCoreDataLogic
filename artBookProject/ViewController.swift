@@ -16,7 +16,8 @@ class ViewController: UIViewController , UITableViewDelegate, UITableViewDataSou
     
     var nameArray = [String]()
     var idArray = [UUID]()
-    
+    var selectedPaintingId : UUID?
+    var selectedPainting = ""
     override func viewDidLoad() {
         super.viewDidLoad()
         
@@ -46,15 +47,17 @@ class ViewController: UIViewController , UITableViewDelegate, UITableViewDataSou
         fetchRequest.returnsObjectsAsFaults = false  //cache den okuma daha hızlı okusun diye
         do{
            let results =  try context.fetch(fetchRequest)//bunun geri döndüreceği şey dizi olucaktır
-            for result in results as! [NSManagedObject]{
-                if let name = result.value(forKey : "name") as? String {
-                    self.nameArray.append(name)
+            if results.count > 0 {
+                for result in results as! [NSManagedObject]{
+                    if let name = result.value(forKey : "name") as? String {
+                        self.nameArray.append(name)
+                    }
+                    if let id = result.value(forKey: "id") as? UUID {
+                        self.idArray.append(id)
+                    }
+                    //veri eklendikten sonra tableview refresh etmeliyim güncellenmeli
+                    self.tableView.reloadData()
                 }
-                if let id = result.value(forKey: "id") as? UUID {
-                    self.idArray.append(id)
-                }
-                //veri eklendikten sonra tableview refresh etmeliyim güncellenmeli
-                self.tableView.reloadData()
             }
             
         }catch{
@@ -63,6 +66,7 @@ class ViewController: UIViewController , UITableViewDelegate, UITableViewDataSou
     }
     
     @objc func addButtonClicked() {
+        selectedPainting = ""  //addButtonClicked bpoş aktarsın
         print("birinci ekran üstteki artı butonunun fonksiyonuyum")
         performSegue(withIdentifier: "toDetailsVC", sender: nil)
     }
@@ -78,11 +82,53 @@ class ViewController: UIViewController , UITableViewDelegate, UITableViewDataSou
     
     // + tuşuna basılınca DetailsVC gelsin ama eğer tableview kısmından tıklanırsa içi dolu olan görünüm gelsin istiyorum hangi isme tıkladıysam onun id sini detay sayfasında gerekli yerleri doldurarak getirsin 
     
+    override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
+        if segue.identifier == "toDetailsVC" {
+            let destinationVC = segue.destination as! DetailsVC
+            destinationVC.chosenPainting = selectedPainting
+            destinationVC.chosenPaintingId = selectedPaintingId
+        }
+    }
     
+    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {   //didSelectRowAt bir veriye tıklandığında segue yapıcaz
+        selectedPainting = nameArray[indexPath.row] //seçilen satırdakini alıcak ve diğer sayfaya götürücek
+        selectedPaintingId = idArray[indexPath.row]
+        performSegue(withIdentifier: "toDetailsVC", sender: nil) //navigasyon (ekranlar arası geçiş)
+    }
     
-    
-    
-    
+    //commit editingStyle kullanıcı delete mi yapıyo update mi ne yapıyo onu algılamak için
+    func tableView(_ tableView: UITableView, commit editingStyle: UITableViewCell.EditingStyle, forRowAt indexPath: IndexPath) {
+        if editingStyle == .delete {
+         print("sil işlemi yapılıyo")
+            //Burada core datadan verilerimizi çekicez
+            let appDelegate = UIApplication.shared.delegate as! AppDelegate //AppDelegate değişken olarak tanımladık
+            let context = appDelegate.persistentContainer.viewContext
+            let fetchRequest = NSFetchRequest<NSFetchRequestResult>(entityName: "Paintings")
+            //ilgili veriyi çekicem sonra silicem bu şekilde yapılıyo çünkü
+            let idString = idArray[indexPath.row].uuidString
+            fetchRequest.predicate = NSPredicate(format: "id == %@",idString)  //nereye tıklandıysa onun id sini bulurum böylece
+            fetchRequest.returnsObjectsAsFaults = false  //cache den okuma daha hızlı okusun diye
+            do{
+               let results =  try context.fetch(fetchRequest)//bunun geri döndüreceği şey dizi olucaktır
+                if results.count > 0 {
+                    for result in results as! [NSManagedObject]{
+                        if let id = result.value(forKey : "id") as? UUID {
+                            if id == idArray[indexPath.row]{
+                                context.delete(result)
+                                nameArray.remove(at: indexPath.row)
+                                idArray.remove(at: indexPath.row)
+                                //veri eklendikten sonra tableview refresh etmeliyim güncellenmeli
+                                self.tableView.reloadData()
+                            }
+                        }
+                    }
+                }
+                //id çağıramadığın zaman forloop cagırarak cıkartabiliyosun
+            }catch{
+                print("error")
+            }
+        }
+    }
     
 }
 
